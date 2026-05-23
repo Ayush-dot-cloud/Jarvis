@@ -5,13 +5,25 @@ from __future__ import annotations
 import logging
 import urllib.parse
 import webbrowser
-
-try:
-    import pywhatkit
-except ImportError:  # pragma: no cover
-    pywhatkit = None  # type: ignore[assignment]
+from typing import Any, Optional
 
 log = logging.getLogger("jarvis.skills.web")
+
+
+def _get_pywhatkit() -> Optional[Any]:
+    """Import pywhatkit lazily.
+
+    pywhatkit -> pyautogui -> mouseinfo eagerly opens an X `Display`, which
+    fails on headless Linux (e.g. CI) with `KeyError: 'DISPLAY'`. Loading it
+    lazily lets the rest of the module import cleanly on any platform.
+    """
+    try:
+        import pywhatkit  # noqa: WPS433 - intentional local import
+
+        return pywhatkit
+    except Exception as exc:  # pragma: no cover - depends on platform
+        log.debug("pywhatkit unavailable: %s", exc)
+        return None
 
 
 KNOWN_SITES = {
@@ -55,9 +67,10 @@ def google_search(query: str) -> str:
     query = query.strip()
     if not query:
         return "What should I search for?"
-    if pywhatkit is not None:
+    pwk = _get_pywhatkit()
+    if pwk is not None:
         try:
-            pywhatkit.search(query)
+            pwk.search(query)
             return f"Searching Google for {query}."
         except Exception as exc:  # pragma: no cover
             log.warning("pywhatkit.search failed, falling back: %s", exc)
@@ -70,9 +83,10 @@ def play_youtube(query: str) -> str:
     query = query.strip()
     if not query:
         return "What should I play on YouTube?"
-    if pywhatkit is not None:
+    pwk = _get_pywhatkit()
+    if pwk is not None:
         try:
-            pywhatkit.playonyt(query)
+            pwk.playonyt(query)
             return f"Playing {query} on YouTube."
         except Exception as exc:  # pragma: no cover
             log.warning("pywhatkit.playonyt failed, falling back: %s", exc)
